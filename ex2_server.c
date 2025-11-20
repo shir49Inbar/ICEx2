@@ -89,7 +89,7 @@ int main(void) {
 
     printf("[NS] Sending resolver port %d to attacker client..\n", resolver_port);
 
-    if (send(conn, "Hello client", 12, 0)) {
+    if (send(conn, &resolver_port, sizeof(int), 0)) {
         printf("send resolver_port");
     }
 
