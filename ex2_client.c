@@ -64,7 +64,7 @@ void send_first_request(void) {
 int main(void) {
     // DNS request to the resolver->attacker domain
     send_first_request();
-
+    sleep(1);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in srv = {0};
     srv.sin_family = AF_INET;
