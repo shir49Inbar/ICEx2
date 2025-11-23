@@ -317,7 +317,7 @@ int check_poisoned(void) {
     resolver.sin_port = htons((RESOLVER_DNS_PORT));
     inet_pton(AF_INET, RESOLVER_IP, &resolver.sin_addr);
 
-    printf("[CLIENT] Sending subdomain query for %s -> resolver (%s:53)..\n");
+    printf("[CLIENT] Sending subdomain query for %s -> resolver (%s:53)..\n", RESOLVER_IP);
 
     if (sendto(udp_sockfd, wire, wire_size, 0, (struct sockaddr*)&resolver, sizeof(resolver)) < 0) {
         printf("sendto failed..");
@@ -386,7 +386,7 @@ int check_poisoned(void) {
     free(wire);
     ldns_pkt_free(query);
     ldns_rdf_deep_free(name);
-    free(resp_pkt);
+    ldns_pkt_free(resp_pkt);
     return poisoned;
 }
 
