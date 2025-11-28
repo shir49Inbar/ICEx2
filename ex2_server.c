@@ -51,7 +51,7 @@ int main(void) {
     dns[8] = dns[9] = 0;
     dns[10] = dns[11] = 0;
 
-    if (sendto(udp_sockfd, buf, (size_t) n, 0, (struct sockaddr*)&resolver_addr, resolver_len) < 0) {
+    if (sendto(udp_sockfd, buf, (size_t)n, 0, (struct sockaddr*)&resolver_addr, resolver_len) < 0) {
         printf("sendto failed");
     }
     else {
