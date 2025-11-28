@@ -44,7 +44,7 @@ int main(void) {
     // here we got the Port number
 
     unsigned char *dns = (unsigned char*) buf;
-    unsigned char* rd = dns[2] & 0x01;
+    unsigned char rd = dns[2] & 0x01;
     dns[2] = 0x80 |rd;
     dns[3] = 0x03;
     dns[6] = dns[7] = 0;
